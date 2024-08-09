@@ -3,6 +3,7 @@ package carnegietechnologies.gallery_saver
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -14,6 +15,7 @@ import android.webkit.MimeTypeMap
 import androidx.exifinterface.media.ExifInterface
 import java.io.*
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 
 /**
  * Core implementation of methods related to File manipulation
@@ -45,8 +47,18 @@ internal object FileUtils {
     ): Boolean {
         val file = File(path)
         val extension = MimeTypeMap.getFileExtensionFromUrl(file.toString())
-        val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        var mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        if (mimeType == null || mimeType.isEmpty()) {
+            mimeType = getMimeTypeOfFile(path)
+        }
+        if (mimeType == null || mimeType.isEmpty()) {
+            mimeType = "image/jpeg"
+        }
         var source = getBytesFromFile(file)
+        if (source == null) {
+            Log.e(TAG, "Error on saving image to gallery cause source is null")
+            return false
+        }
 
         var directory = Environment.DIRECTORY_PICTURES
         if (toDcim) {
@@ -105,9 +117,15 @@ internal object FileUtils {
                 imageUri = null
             }
         } catch (e: IOException) {
-            contentResolver.delete(imageUri!!, null, null)
+            Log.e(TAG, e.toString())
+            try {
+                contentResolver.delete(imageUri!!, null, null)
+            } catch (e: java.lang.Exception) {
+                Log.e(TAG, e.toString())
+            }
             return false
         } catch (t: Throwable) {
+            Log.e(TAG, t.toString())
             return false
         }
 
@@ -231,14 +249,53 @@ internal object FileUtils {
     }
 
     private fun getBytesFromFile(file: File): ByteArray? {
-        val size = file.length().toInt()
-        val bytes = ByteArray(size)
-        val buf = BufferedInputStream(FileInputStream(file))
-        buf.use {
-            buf.read(bytes, 0, bytes.size)
-        }
+        try {
+            if (!file.exists()) {
+                Log.e(TAG, "Error: get bytes from a non-existed file")
+                return null
+            }
+            val size = file.length().toInt()
+            val bytes = ByteArray(size)
+            val buf = BufferedInputStream(FileInputStream(file))
+            buf.use {
+                buf.read(bytes, 0, bytes.size)
+            }
 
-        return bytes
+            return bytes
+        }catch (e: Throwable) {
+            Log.e(TAG, "Get bytes from file error: $e")
+            e.printStackTrace()
+        }
+        return null
+    }
+
+    /**
+     * Only For Image: https://stackoverflow.com/a/19739471
+     */
+
+    private fun getMimeTypeOfUri(context: Context, uri: Uri?): String {
+        val opt = BitmapFactory.Options()
+        /* The doc says that if inJustDecodeBounds set to true, the decoder
+     * will return null (no bitmap), but the out... fields will still be
+     * set, allowing the caller to query the bitmap without having to
+     * allocate the memory for its pixels. */
+        opt.inJustDecodeBounds = true
+
+        val istream = context.contentResolver.openInputStream(uri!!)
+        BitmapFactory.decodeStream(istream, null, opt)
+        istream!!.close()
+
+        return opt.outMimeType
+    }
+
+    private fun getMimeTypeOfFile(pathName: String?): String? {
+        if (pathName == null) {
+            return null
+        }
+        val opt = BitmapFactory.Options()
+        opt.inJustDecodeBounds = true
+        BitmapFactory.decodeFile(pathName, opt)
+        return opt.outMimeType
     }
 
     /**

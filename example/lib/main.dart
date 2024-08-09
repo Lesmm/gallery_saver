@@ -86,7 +86,7 @@ class _MyAppState extends State<MyApp> {
         GallerySaver.saveImage(recordedImage.path, albumName: albumName)
             .then((bool success) {
           setState(() {
-            firstButtonText = 'image saved!';
+            firstButtonText = success ? 'image saved!' : "image save failed!";
           });
         });
       }
@@ -104,7 +104,7 @@ class _MyAppState extends State<MyApp> {
         GallerySaver.saveVideo(recordedVideo.path, albumName: albumName)
             .then((bool success) {
           setState(() {
-            secondButtonText = 'video saved!';
+            secondButtonText = success ? 'video saved!' : "image save failed!";
           });
         });
       }

@@ -22,8 +22,7 @@ class GallerySaver internal constructor(private val activity: Activity) :
     private var albumName: String = ""
     private var toDcim: Boolean = false
 
-    private val job = Job()
-    private val uiScope = CoroutineScope(Dispatchers.Main + job)
+    private var uiScope: CoroutineScope? = null
 
     /**
      * Saves image or video to device
@@ -62,26 +61,34 @@ class GallerySaver internal constructor(private val activity: Activity) :
     }
 
     private fun saveMediaFile() {
-        uiScope.launch {
+        if (uiScope == null) {
+            uiScope = CoroutineScope(Dispatchers.Main + Job())
+        }
+        uiScope!!.launch {
+            var isSuccess: Boolean = false
             val success = async(Dispatchers.IO) {
                 if (mediaType == MediaType.video) {
-                    FileUtils.insertVideo(activity.contentResolver, filePath, albumName, toDcim)
+                    isSuccess = FileUtils.insertVideo(activity.contentResolver, filePath, albumName, toDcim)
                 } else {
-                    FileUtils.insertImage(activity.contentResolver, filePath, albumName, toDcim)
+                    isSuccess = FileUtils.insertImage(activity.contentResolver, filePath, albumName, toDcim)
                 }
             }
             success.await()
-            finishWithSuccess()
+            if (isSuccess) {
+                finishWithSuccess()
+            } else {
+                finishWithFailure()
+            }
         }
     }
 
     private fun finishWithSuccess() {
-        pendingResult!!.success(true)
+        pendingResult?.success(true)
         pendingResult = null
     }
 
     private fun finishWithFailure() {
-        pendingResult!!.success(false)
+        pendingResult?.success(false)
         pendingResult = null
     }
 
